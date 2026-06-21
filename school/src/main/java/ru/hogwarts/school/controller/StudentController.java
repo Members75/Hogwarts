@@ -1,6 +1,6 @@
 package ru.hogwarts.school.controller;
 
-import org.apache.catalina.util.ParameterMap;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.hogwarts.school.model.Student;
 import ru.hogwarts.school.service.StudentService;
@@ -11,8 +11,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/student")
 public class StudentController {
+
     private final StudentService studentService;
-    private ParameterMap<Object, Object> students;
 
     public StudentController(StudentService studentService) {
         this.studentService = studentService;
@@ -24,8 +24,12 @@ public class StudentController {
     }
 
     @GetMapping("/{id}")
-    public Student getById(@PathVariable Long id) {
-        return studentService.get(id);
+    public ResponseEntity<Student> getById(@PathVariable Long id) {
+        Student student = studentService.get(id);
+        if (student == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(student);
     }
 
     @PostMapping
@@ -34,19 +38,33 @@ public class StudentController {
     }
 
     @PutMapping("/{id}")
-    public Student update(@PathVariable Long id, @RequestBody Student student) {
-        return studentService.update(id, student);
+    public ResponseEntity<Student> update(@PathVariable Long id, @RequestBody Student student) {
+        // Аналогично можно добавить проверку на существование перед обновлением
+        Student updated = studentService.update(id, student);
+        if (updated == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
+    @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         studentService.delete(id);
     }
+
     @GetMapping("/age/{age}")
-    public Map<Long, Student> filterByAge(@PathVariable int age) {
-        return students.entrySet()
+    public Map<Long, Student> filterByAge(@PathVariable Integer age) {
+        return studentService.getAll().entrySet()
                 .stream()
-                .filter(e -> e.getValue().getAge() == age)
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                .filter(e -> {
+                    Integer studentAge = e.getValue().getAge();
+                    return studentAge != null && studentAge.equals(age);
+                })
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (existing, replacement) -> existing
+                ));
     }
 }
